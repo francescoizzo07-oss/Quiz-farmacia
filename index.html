@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Simulatore Farmaceutico</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2c7be5">
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 15px;
+  background: #f5f5f5;
+}
+h2, h3 {
+  margin-top: 10px;
+}
+button {
+  width: 100%;
+  padding: 15px;
+  font-size: 16px;
+  margin-top: 15px;
+}
+.option {
+  background: #fff;
+  padding: 14px;
+  margin: 10px 0;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+#quiz, #config {
+  max-width: 700px;
+  margin: auto;
+}
+.timer {
+  font-weight: bold;
+  color: #c00;
+}
+</style>
+</head>
+
+<body onload="initApp()">
+
+<!-- CONFIGURAZIONE -->
+<div id="config">
+  <h2>Configurazione</h2>
+
+  <h3>Livello di preparazione</h3>
+  <label><input type="checkbox" value="le_sai"> Le sai (<span id="c_le_sai"></span>)</label><br>
+  <label><input type="checkbox" value="ancora_sforzo"> Ancora un piccolo sforzo (<span id="c_sforzo"></span>)</label><br>
+  <label><input type="checkbox" value="ripetile"> Ripetile (<span id="c_ripetile"></span>)</label><br>
+  <label><input type="checkbox" value="non_le_sai"> Non le sai (<span id="c_non_le_sai"></span>)</label><br>
+  <label><input type="checkbox" value="non_risposta"> Non risposte (<span id="c_non_risposta"></span>)</label><br>
+  <label><input type="checkbox" value="tutte"> Tutte (<span id="c_tutte"></span>)</label>
+
+  <h3>Ordinamento domande</h3>
+  <label><input type="radio" name="orderQ" value="random" checked> Casuale</label><br>
+  <label><input type="radio" name="orderQ" value="alphabetic"> Alfabetico</label><br>
+  <label><input type="radio" name="orderQ" value="official"> Ufficiale</label>
+
+  <h3>Ordinamento risposte</h3>
+  <label><input type="radio" name="orderA" value="random" checked> Casuale</label><br>
+  <label><input type="radio" name="orderA" value="official"> Ufficiale</label><br>
+
+  <button onclick="startFromConfig()">📘 Avvia Studio</button>
+  <button onclick="startExam()">🏁 Simulazione Concorso</button>
+</div>
+
+<!-- QUIZ -->
+<div id="quiz" style="display:none">
+  <div id="quiz-header"></div>
+  <div id="quiz-question"></div>
+  <div id="quiz-options"></div>
+  <button id="nextBtn" onclick="nextQuestion()" style="display:none">Avanti</button>
+</div>
+
+<script>
+// ===== DATABASE DI ESEMPIO =====
+const database = [
+  { id:1, q:"Il paracetamolo è:", options:["Antibiotico","Analgesico","Antivirale"], a:1 },
+  { id:2, q:"Il diclofenac è un:", options:["Oppioide","FANS","Cortisonico"], a:1 },
+  { id:3, q:"Vitamina liposolubile:", options:["Vitamina C","Vitamina B12","Vitamina A"], a:2 }
+];
+
+// ===== INIZIALIZZA STATISTICHE =====
+database.forEach(q=>{
+  q.stats = { seen:0, correct:0, wrong:0, level:"non_risposta" };
+});
+
+// ===== VARIABILI GLOBALI =====
+let quizQuestions = [];
+let currentIndex = 0;
+let studyMode = true;
+
+let examQuestions = [];
+let examIndex = 0;
+let examScore = 0;
+let examTime = 1800;
+let examTimer = null;
+
+const PROGRESS_KEY = "quizProgress";
+
+// ===== INIT =====
+function initApp() {
+  loadStats();
+  updateCounters();
+  checkResume();
+}
+
+// ===== STATISTICHE =====
+function updateStats(q, correct) {
+  q.stats.seen++;
+  if (correct) q.stats.correct++;
+  else q.stats.wrong++;
+
+  if (correct) {
+    q.stats.level = q.stats.correct >= 2 ? "le_sai" : "ancora_sforzo";
+  } else {
+    if (q.stats.level === "le_sai") q.stats.level = "ripetile";
+    else q.stats.level = "non_le_sai";
+  }
+  saveStats();
+}
+
+function saveStats() {
+  const s = {};
+  database.forEach(q=>s[q.id]=q.stats);
+  localStorage.setItem("quizStats", JSON.stringify(s));
+}
+
+function loadStats() {
+  const s = JSON.parse(localStorage.getItem("quizStats"));
+  if (!s) return;
+  database.forEach(q=>{
+    if (s[q.id]) q.stats = s[q.id];
+  });
+}
+
+// ===== CONTATORI =====
+function updateCounters() {
+  document.getElementById("c_le_sai").innerText = database.filter(q=>q.stats.level==="le_sai").length;
+  document.getElementById("c_sforzo").innerText = database.filter(q=>q.stats.level==="ancora_sforzo").length;
+  document.getElementById("c_ripetile").innerText = database.filter(q=>q.stats.level==="ripetile").length;
+  document.getElementById("c_non_le_sai").innerText = database.filter(q=>q.stats.level==="non_le_sai").length;
+  document.getElementById("c_non_risposta").innerText = database.filter(q=>q.stats.level==="non_risposta").length;
+  document.getElementById("c_tutte").innerText = database.length;
+}
+
+// ===== AVVIO STUDIO =====
+function startFromConfig() {
+  const levels = [...document.querySelectorAll("input[type=checkbox]:checked")].map(c=>c.value);
+  quizQuestions = levels.includes("tutte") || levels.length===0
+    ? [...database]
+    : database.filter(q=>levels.includes(q.stats.level));
+
+  shuffle(quizQuestions);
+  currentIndex = 0;
+  studyMode = true;
+
+  document.getElementById("config").style.display="none";
+  document.getElementById("quiz").style.display="block";
+  loadQuestion();
+}
+
+// ===== QUIZ =====
+function loadQuestion() {
+  const q = quizQuestions[currentIndex];
+  document.getElementById("quiz-header").innerText =
+    `Domanda ${currentIndex+1}/${quizQuestions.length}`;
+
+  document.getElementById("quiz-question").innerHTML = `<b>${q.q}</b>`;
+  const opts = document.getElementById("quiz-options");
+  opts.innerHTML = "";
+
+  q.options.forEach((o,i)=>{
+    const d = document.createElement("div");
+    d.className="option";
+    d.innerText=o;
+    d.onclick=()=>answer(q,i,d);
+    opts.appendChild(d);
+  });
+}
+
+function answer(q,i,el){
+  document.querySelectorAll(".option").forEach(o=>o.onclick=null);
+  const correct = i===q.a;
+  el.style.background = correct ? "#c8f7c5" : "#f7c5c5";
+  if(!correct) document.querySelectorAll(".option")[q.a].style.background="#c8f7c5";
+  if(studyMode) updateStats(q,correct);
+  updateCounters();
+  document.getElementById("nextBtn").style.display="block";
+}
+
+function nextQuestion(){
+  currentIndex++;
+  saveProgress();
+  if(currentIndex<quizQuestions.length) loadQuestion();
+  else finishQuiz();
+}
+
+// ===== FINE =====
+function finishQuiz(){
+  clearProgress();
+  document.getElementById("quiz").innerHTML =
+    "<h3>Fine esercitazione</h3><button onclick='location.reload()'>Torna al menu</button>";
+}
+
+// ===== RIPRESA =====
+function saveProgress(){
+  localStorage.setItem(PROGRESS_KEY, JSON.stringify({
+    ids: quizQuestions.map(q=>q.id),
+    index: currentIndex
+  }));
+}
+function clearProgress(){ localStorage.removeItem(PROGRESS_KEY); }
+
+function checkResume(){
+  const p = JSON.parse(localStorage.getItem(PROGRESS_KEY));
+  if(!p) return;
+  if(!confirm("Vuoi riprendere da dove avevi lasciato?")){ clearProgress(); return; }
+  quizQuestions = p.ids.map(id=>database.find(q=>q.id===id));
+  currentIndex = p.index;
+  document.getElementById("config").style.display="none";
+  document.getElementById("quiz").style.display="block";
+  loadQuestion();
+}
+
+// ===== SIMULAZIONE =====
+function startExam(){
+  studyMode=false;
+  examQuestions=[...database];
+  shuffle(examQuestions);
+  examQuestions=examQuestions.slice(0,100);
+  examIndex=0; examScore=0; examTime=1800;
+
+  document.getElementById("config").style.display="none";
+  document.getElementById("quiz").style.display="block";
+  startExamTimer();
+  loadExamQuestion();
+}
+
+function startExamTimer(){
+  examTimer=setInterval(()=>{
+    examTime--;
+    document.getElementById("quiz-header").innerHTML =
+      `Simulazione ${examIndex+1}/100 — ⏱ ${Math.floor(examTime/60)}:${String(examTime%60).padStart(2,"0")}`;
+    if(examTime<=0) finishExam();
+  },1000);
+}
+
+function loadExamQuestion(){
+  const q=examQuestions[examIndex];
+  document.getElementById("quiz-question").innerHTML=`<b>${q.q}</b>`;
+  const opts=document.getElementById("quiz-options");
+  opts.innerHTML="";
+  q.options.forEach((o,i)=>{
+    const d=document.createElement("div");
+    d.className="option";
+    d.innerText=o;
+    d.onclick=()=>{ if(i===q.a) examScore++; examIndex++; examIndex<100?loadExamQuestion():finishExam(); };
+    opts.appendChild(d);
+  });
+}
+
+function finishExam(){
+  clearInterval(examTimer);
+  document.getElementById("quiz").innerHTML =
+    `<h3>Simulazione terminata</h3><p>Punteggio: <b>${examScore}/100</b></p>
+     <button onclick="location.reload()">Torna al menu</button>`;
+}
+
+// ===== UTILS =====
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}}
+</script>
+
+<script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("service-worker.js");
+}
+</script>
+
+</body>
+</html>
