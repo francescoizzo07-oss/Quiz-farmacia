@@ -1,7 +1,7 @@
 self.addEventListener("install", e => {
   e.waitUntil(
     caches.open("quiz-cache").then(cache =>
-      cache.addAll(["index.html", "manifest.json", "icon.png"])
+      cache.addAll(["./"])
     )
   );
 });
