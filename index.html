@@ -12,12 +12,13 @@
 body {
   font-family: Arial, sans-serif;
   margin: 0;
-  padding: 12px;
+  padding: 0;
   background: #f4f4f4;
 }
 #config, #quiz {
   max-width: 720px;
   margin: auto;
+  padding: 12px;
 }
 .option {
   background: #fff;
@@ -28,205 +29,181 @@ body {
 }
 button {
   padding: 12px;
-  width: 100%;
-  margin-top: 10px;
   font-size: 16px;
+}
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-top: 1px solid #ccc;
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 20px;
+}
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: none;
+  justify-content: center;
+  align-items: center;
+}
+.modal-content {
+  background: #fff;
+  padding: 20px;
+  width: 90%;
+  max-width: 400px;
+  border-radius: 8px;
 }
 textarea {
   width: 100%;
-  min-height: 80px;
-}
-.nav {
-  display: flex;
-  gap: 10px;
-}
-.counter {
-  margin: 10px 0;
-  font-weight: bold;
+  min-height: 100px;
 }
 </style>
 </head>
 
 <body onload="initApp()">
 
-<!-- CONFIG -->
+<!-- MENU -->
 <div id="config">
   <h2>Menu principale</h2>
 
+  <h3>Ordine</h3>
+  <label>Domande:
+    <select id="orderQuestions">
+      <option value="random">Casuale</option>
+      <option value="sequential">Sequenziale</option>
+    </select>
+  </label><br><br>
+
+  <label>Risposte:
+    <select id="orderAnswers">
+      <option value="fixed">Fisso</option>
+      <option value="random">Casuale</option>
+    </select>
+  </label>
+
   <h3>Livello</h3>
-  <label><input type="checkbox" value="le_sai"> Le sai (<span id="c_le_sai"></span>)</label><br>
-  <label><input type="checkbox" value="ancora_sforzo"> Ancora un piccolo sforzo (<span id="c_sforzo"></span>)</label><br>
-  <label><input type="checkbox" value="ripetile"> Ripetile (<span id="c_ripetile"></span>)</label><br>
-  <label><input type="checkbox" value="non_le_sai"> Non le sai (<span id="c_non_le_sai"></span>)</label><br>
-  <label><input type="checkbox" value="non_risposta"> Non risposte (<span id="c_non_risposta"></span>)</label><br>
-  <label><input type="checkbox" value="tutte"> Tutte (<span id="c_tutte"></span>)</label>
+  <label><input type="checkbox" value="tutte" checked> Tutte</label><br><br>
 
   <button onclick="startStudy()">📘 Avvia Studio</button>
-  <button onclick="startExam()">🏁 Simulazione Concorso</button>
 </div>
 
 <!-- QUIZ -->
 <div id="quiz" style="display:none">
-  <button onclick="goToMenu()">🏠 Menu</button>
 
-  <div class="counter">
-    ✔️ <span id="okCount">0</span> |
-    ❌ <span id="koCount">0</span>
+  <!-- TOP -->
+  <div class="top-bar">
+    <button onclick="goToMenu()">⬅️</button>
+    <div>✔️ <span id="okCount">0</span> | ❌ <span id="koCount">0</span></div>
   </div>
 
-  <div id="quiz-header"></div>
+  <h3 id="quiz-header"></h3>
   <div id="quiz-question"></div>
   <div id="quiz-options"></div>
+</div>
 
-  <div class="nav">
-    <button onclick="prevQuestion()">⬅️ Indietro</button>
-    <button onclick="nextQuestion()">➡️ Avanti</button>
+<!-- BOTTOM -->
+<div class="bottom-bar" id="navBar" style="display:none">
+  <button onclick="prevQuestion()">⬅️</button>
+  <button onclick="openNote()">📝</button>
+  <button onclick="nextQuestion()">➡️</button>
+</div>
+
+<!-- MODAL NOTE -->
+<div class="modal" id="noteModal">
+  <div class="modal-content">
+    <h3>Nota personale</h3>
+    <textarea id="noteBox"></textarea>
+    <button onclick="saveNote()">💾 Salva</button>
+    <button onclick="deleteNote()">🗑 Cancella</button>
+    <button onclick="closeNote()">⬅️ Torna alla domanda</button>
   </div>
-
-  <h4>📝 Nota personale</h4>
-  <textarea id="noteBox" placeholder="Scrivi una nota per questa domanda..."></textarea>
-  <button onclick="saveCurrentNote()">💾 Salva nota</button>
-  <button onclick="deleteCurrentNote()">🗑 Cancella nota</button>
 </div>
 
 <script>
-// ===== DATABASE DI TEST =====
 const database = [
-  { id:1, q:"Il paracetamolo è:", options:["Antibiotico","Analgesico","Antivirale"], a:1 },
-  { id:2, q:"Il diclofenac è un:", options:["Oppioide","FANS","Cortisonico"], a:1 },
-  { id:3, q:"Vitamina liposolubile:", options:["Vitamina C","Vitamina B12","Vitamina A"], a:2 }
+  {id:1,q:"Il paracetamolo è:",options:["Antibiotico","Analgesico","Antivirale"],a:1},
+  {id:2,q:"Il diclofenac è un:",options:["Oppioide","FANS","Cortisonico"],a:1}
 ];
 
-database.forEach(q=>{
-  q.stats={seen:0,correct:0,wrong:0,level:"non_risposta"};
-});
-
-// ===== VARIABILI =====
-let quizQuestions=[], currentIndex=0, studyMode=true;
-let sessionCorrect=0, sessionWrong=0, answered={};
+let quizQuestions=[],currentIndex=0;
+let sessionCorrect=0,sessionWrong=0,answered={};
 
 const NOTES_KEY="quizNotes";
-const STATS_KEY="quizStats";
 
-// ===== INIT =====
-function initApp(){
-  loadStats();
-  updateCounters();
-}
+function initApp(){}
 
-// ===== STUDIO =====
 function startStudy(){
-  resetSession();
-  const levels=[...document.querySelectorAll("input[type=checkbox]:checked")].map(c=>c.value);
-  quizQuestions=levels.includes("tutte")||levels.length===0?[...database]:
-    database.filter(q=>levels.includes(q.stats.level));
-  shuffle(quizQuestions);
+  quizQuestions=[...database];
+  if(document.getElementById("orderQuestions").value==="random") shuffle(quizQuestions);
   currentIndex=0;
-  studyMode=true;
-  showQuiz();
-}
-
-// ===== QUIZ =====
-function showQuiz(){
+  sessionCorrect=0;sessionWrong=0;answered={};
   document.getElementById("config").style.display="none";
   document.getElementById("quiz").style.display="block";
+  document.getElementById("navBar").style.display="flex";
   loadQuestion();
 }
 
 function loadQuestion(){
   const q=quizQuestions[currentIndex];
-  document.getElementById("quiz-header").innerText=
-    `Domanda ${currentIndex+1}/${quizQuestions.length}`;
-  document.getElementById("quiz-question").innerHTML=`<b>${q.q}</b>`;
+  document.getElementById("quiz-header").innerText=`Domanda ${currentIndex+1}/${quizQuestions.length}`;
+  document.getElementById("quiz-question").innerHTML="<b>"+q.q+"</b>";
   const opts=document.getElementById("quiz-options");
   opts.innerHTML="";
-  q.options.forEach((o,i)=>{
+  let answers=[...q.options];
+  if(document.getElementById("orderAnswers").value==="random") shuffle(answers);
+  answers.forEach(o=>{
     const d=document.createElement("div");
     d.className="option";
     d.innerText=o;
-    d.onclick=()=>answer(q,i,d);
+    d.onclick=()=>answer(q,o,d);
     opts.appendChild(d);
   });
-  document.getElementById("noteBox").value=loadNote(q.id);
 }
 
-function answer(q,i,el){
+function answer(q,text,el){
   if(answered[q.id])return;
   answered[q.id]=true;
-  const correct=i===q.a;
-  if(correct){el.style.background="#c8f7c5";sessionCorrect++;}
-  else{el.style.background="#f7c5c5";sessionWrong++;}
-  updateSessionCounter();
-  if(studyMode)updateStats(q,correct);
-}
-
-function prevQuestion(){ if(currentIndex>0){currentIndex--;loadQuestion();} }
-function nextQuestion(){ if(currentIndex<quizQuestions.length-1){currentIndex++;loadQuestion();} }
-
-// ===== CONTATORI =====
-function resetSession(){
-  sessionCorrect=0;sessionWrong=0;answered={};
-  updateSessionCounter();
-}
-function updateSessionCounter(){
+  const correct=q.options[q.a]===text;
+  el.style.background=correct?"#c8f7c5":"#f7c5c5";
+  correct?sessionCorrect++:sessionWrong++;
   document.getElementById("okCount").innerText=sessionCorrect;
   document.getElementById("koCount").innerText=sessionWrong;
 }
 
-// ===== STATISTICHE =====
-function updateStats(q,correct){
-  q.stats.seen++;
-  if(correct){q.stats.correct++;q.stats.level=q.stats.correct>=2?"le_sai":"ancora_sforzo";}
-  else{q.stats.wrong++;q.stats.level=q.stats.level==="le_sai"?"ripetile":"non_le_sai";}
-  saveStats();
-}
-function saveStats(){
-  const s={};database.forEach(q=>s[q.id]=q.stats);
-  localStorage.setItem(STATS_KEY,JSON.stringify(s));
-}
-function loadStats(){
-  const s=JSON.parse(localStorage.getItem(STATS_KEY));
-  if(!s)return;
-  database.forEach(q=>{if(s[q.id])q.stats=s[q.id];});
-}
-function updateCounters(){
-  document.getElementById("c_le_sai").innerText=database.filter(q=>q.stats.level==="le_sai").length;
-  document.getElementById("c_sforzo").innerText=database.filter(q=>q.stats.level==="ancora_sforzo").length;
-  document.getElementById("c_ripetile").innerText=database.filter(q=>q.stats.level==="ripetile").length;
-  document.getElementById("c_non_le_sai").innerText=database.filter(q=>q.stats.level==="non_le_sai").length;
-  document.getElementById("c_non_risposta").innerText=database.filter(q=>q.stats.level==="non_risposta").length;
-  document.getElementById("c_tutte").innerText=database.length;
-}
+function prevQuestion(){if(currentIndex>0){currentIndex--;loadQuestion();}}
+function nextQuestion(){if(currentIndex<quizQuestions.length-1){currentIndex++;loadQuestion();}}
 
-// ===== NOTE =====
-function saveNote(id){
-  const n=JSON.parse(localStorage.getItem(NOTES_KEY))||{};
-  n[id]=document.getElementById("noteBox").value;
-  localStorage.setItem(NOTES_KEY,JSON.stringify(n));
+function goToMenu(){location.reload();}
+
+// NOTE
+function openNote(){
+  const notes=JSON.parse(localStorage.getItem(NOTES_KEY))||{};
+  document.getElementById("noteBox").value=notes[quizQuestions[currentIndex].id]||"";
+  document.getElementById("noteModal").style.display="flex";
 }
-function loadNote(id){
-  const n=JSON.parse(localStorage.getItem(NOTES_KEY))||{};
-  return n[id]||"";
+function closeNote(){document.getElementById("noteModal").style.display="none";}
+function saveNote(){
+  const notes=JSON.parse(localStorage.getItem(NOTES_KEY))||{};
+  notes[quizQuestions[currentIndex].id]=document.getElementById("noteBox").value;
+  localStorage.setItem(NOTES_KEY,JSON.stringify(notes));
 }
-function deleteCurrentNote(){
-  const id=quizQuestions[currentIndex].id;
-  const n=JSON.parse(localStorage.getItem(NOTES_KEY))||{};
-  delete n[id];
-  localStorage.setItem(NOTES_KEY,JSON.stringify(n));
+function deleteNote(){
+  const notes=JSON.parse(localStorage.getItem(NOTES_KEY))||{};
+  delete notes[quizQuestions[currentIndex].id];
+  localStorage.setItem(NOTES_KEY,JSON.stringify(notes));
   document.getElementById("noteBox").value="";
 }
 
-// ===== MENU =====
-function goToMenu(){ location.reload(); }
-
-// ===== UTILS =====
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}}
-</script>
-
-<script>
-if("serviceWorker"in navigator){
-  navigator.serviceWorker.register("service-worker.js");
-}
 </script>
 
 </body>
