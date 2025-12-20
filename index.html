@@ -96,28 +96,32 @@ textarea {
 <div id="menu" class="container">
   <h2>Configurazione</h2>
 
-  <div class="card">
-    <h3>Livello di preparazione</h3>
-    <label><input type="checkbox" value="tutte" checked> Tutte</label>
-  </div>
+<div class="card">
+  <h3>Livello di preparazione</h3>
 
-  <div class="card">
-    <h3>Ordinamento dei quiz</h3>
-    <label>Domande:
-      <select id="orderQuestions">
-        <option value="random">Casuale</option>
-        <option value="alphabetic">Alfabetico</option>
-        <option value="official">Ufficiale</option>
-      </select>
-    </label>
-    <label>Risposte:
-      <select id="orderAnswers">
-        <option value="random">Casuale</option>
-        <option value="official">Ufficiale</option>
-        <option value="onlyCorrect">Solo risposta esatta</option>
-      </select>
-    </label>
-  </div>
+  <label><input type="checkbox" value="le_sai"> Le sai <span id="c_le_sai">0</span></label>
+  <label><input type="checkbox" value="ancora_sforzo"> Ancora un piccolo sforzo <span id="c_sforzo">0</span></label>
+  <label><input type="checkbox" value="ripetile"> Ripetile <span id="c_ripetile">0</span></label>
+  <label><input type="checkbox" value="non_le_sai"> Non le sai <span id="c_non_le_sai">0</span></label>
+  <label><input type="checkbox" value="non_risposte" checked> Non risposte <span id="c_non_risposte">0</span></label>
+  <label><input type="checkbox" value="tutte"> Tutte <span id="c_tutte">0</span></label>
+</div>
+
+<div class="card">
+  <h3>Ordinamento dei quiz</h3>
+
+  <strong>Domande</strong>
+  <label><input type="radio" name="orderQuestions" value="random" checked> Casuale</label>
+  <label><input type="radio" name="orderQuestions" value="alphabetic"> Alfabetico</label>
+  <label><input type="radio" name="orderQuestions" value="official"> Ufficiale</label>
+
+  <br>
+
+  <strong>Risposte</strong>
+  <label><input type="radio" name="orderAnswers" value="random" checked> Casuale</label>
+  <label><input type="radio" name="orderAnswers" value="official"> Ufficiale</label>
+  <label><input type="radio" name="orderAnswers" value="onlyCorrect"> Solo risposta esatta</label>
+</div>
 
   <div class="card">
     <h3>Modalità</h3>
