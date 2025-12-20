@@ -5,44 +5,64 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Simulatore Farmaceutico</title>
 
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#2c7be5">
-
 <style>
 body {
-  font-family: Arial, sans-serif;
   margin: 0;
-  padding: 0;
-  background: #f4f4f4;
+  font-family: Arial, sans-serif;
+  background: #2f3e4e;
+  color: #fff;
 }
-#config, #quiz {
+.container {
   max-width: 720px;
   margin: auto;
-  padding: 12px;
+  padding: 16px;
+}
+.card {
+  background: #3b4a5a;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+h2, h3 {
+  margin-top: 0;
+}
+label {
+  display: block;
+  margin: 10px 0;
+}
+button {
+  padding: 14px;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+}
+button.primary {
+  width: 100%;
+  background: #7fb7ff;
+  color: #000;
+  font-weight: bold;
 }
 .option {
   background: #fff;
+  color: #000;
   padding: 14px;
+  border-radius: 10px;
   margin: 10px 0;
-  border-radius: 8px;
-  border: 1px solid #ccc;
 }
-button {
-  padding: 12px;
-  font-size: 16px;
-}
-.top-bar {
+.option.correct { background: #9be7a1; }
+.option.wrong { background: #f7a3a3; }
+
+.topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
-.bottom-bar {
+.bottombar {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  background: #fff;
-  border-top: 1px solid #ccc;
+  background: #1f2a36;
   display: flex;
   justify-content: space-between;
   padding: 10px 20px;
@@ -50,17 +70,18 @@ button {
 .modal {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0,0,0,.6);
   display: none;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
 }
 .modal-content {
   background: #fff;
+  color: #000;
   padding: 20px;
+  border-radius: 10px;
   width: 90%;
   max-width: 400px;
-  border-radius: 8px;
 }
 textarea {
   width: 100%;
@@ -69,138 +90,170 @@ textarea {
 </style>
 </head>
 
-<body onload="initApp()">
+<body>
 
 <!-- MENU -->
-<div id="config">
-  <h2>Menu principale</h2>
+<div id="menu" class="container">
+  <h2>Configurazione</h2>
 
-  <h3>Ordine</h3>
-  <label>Domande:
-    <select id="orderQuestions">
-      <option value="random">Casuale</option>
-      <option value="sequential">Sequenziale</option>
-    </select>
-  </label><br><br>
+  <div class="card">
+    <h3>Livello di preparazione</h3>
+    <label><input type="checkbox" value="tutte" checked> Tutte</label>
+  </div>
 
-  <label>Risposte:
-    <select id="orderAnswers">
-      <option value="fixed">Fisso</option>
-      <option value="random">Casuale</option>
-    </select>
-  </label>
+  <div class="card">
+    <h3>Ordinamento dei quiz</h3>
+    <label>Domande:
+      <select id="orderQuestions">
+        <option value="random">Casuale</option>
+        <option value="alphabetic">Alfabetico</option>
+        <option value="official">Ufficiale</option>
+      </select>
+    </label>
+    <label>Risposte:
+      <select id="orderAnswers">
+        <option value="random">Casuale</option>
+        <option value="official">Ufficiale</option>
+        <option value="onlyCorrect">Solo risposta esatta</option>
+      </select>
+    </label>
+  </div>
 
-  <h3>Livello</h3>
-  <label><input type="checkbox" value="tutte" checked> Tutte</label><br><br>
+  <div class="card">
+    <h3>Modalità</h3>
+    <label><input type="radio" name="mode" value="study" checked> Esercizio</label>
+    <label><input type="radio" name="mode" value="exam"> Simulazione esame</label>
+  </div>
 
-  <button onclick="startStudy()">📘 Avvia Studio</button>
+  <button class="primary" onclick="start()">AVVIA</button>
 </div>
 
 <!-- QUIZ -->
-<div id="quiz" style="display:none">
+<div id="quiz" class="container" style="display:none">
 
-  <!-- TOP -->
-  <div class="top-bar">
-    <button onclick="goToMenu()">⬅️</button>
-    <div>✔️ <span id="okCount">0</span> | ❌ <span id="koCount">0</span></div>
+  <div class="topbar">
+    <button onclick="goMenu()">⬅️</button>
+    <div id="status"></div>
   </div>
 
-  <h3 id="quiz-header"></h3>
-  <div id="quiz-question"></div>
-  <div id="quiz-options"></div>
+  <h3 id="progress"></h3>
+  <div id="question"></div>
+  <div id="options"></div>
 </div>
 
-<!-- BOTTOM -->
-<div class="bottom-bar" id="navBar" style="display:none">
-  <button onclick="prevQuestion()">⬅️</button>
+<div class="bottombar" id="nav" style="display:none">
+  <button onclick="prev()">⬅️</button>
   <button onclick="openNote()">📝</button>
-  <button onclick="nextQuestion()">➡️</button>
+  <button onclick="next()">➡️</button>
 </div>
 
-<!-- MODAL NOTE -->
+<!-- NOTE -->
 <div class="modal" id="noteModal">
   <div class="modal-content">
     <h3>Nota personale</h3>
     <textarea id="noteBox"></textarea>
-    <button onclick="saveNote()">💾 Salva</button>
-    <button onclick="deleteNote()">🗑 Cancella</button>
-    <button onclick="closeNote()">⬅️ Torna alla domanda</button>
+    <button onclick="saveNote()">Salva</button>
+    <button onclick="deleteNote()">Cancella</button>
+    <button onclick="closeNote()">Torna alla domanda</button>
   </div>
 </div>
 
 <script>
-const database = [
-  {id:1,q:"Il paracetamolo è:",options:["Antibiotico","Analgesico","Antivirale"],a:1},
-  {id:2,q:"Il diclofenac è un:",options:["Oppioide","FANS","Cortisonico"],a:1}
+/* DATABASE DI ESEMPIO */
+const db = [
+  {id:1,q:"Il paracetamolo è:",o:["Antibiotico","Analgesico","Antivirale"],a:1},
+  {id:2,q:"Il diclofenac è un:",o:["Oppioide","FANS","Cortisonico"],a:1}
 ];
 
-let quizQuestions=[],currentIndex=0;
-let sessionCorrect=0,sessionWrong=0,answered={};
+let questions=[],i=0,mode="study",ok=0,ko=0,answered={};
+const NOTES="quizNotes";
 
-const NOTES_KEY="quizNotes";
+/* START */
+function start(){
+  mode=document.querySelector("input[name=mode]:checked").value;
+  questions=[...db];
 
-function initApp(){}
+  if(mode==="exam"){
+    questions=shuffle(questions).slice(0,100);
+    startTimer(30*60);
+  } else {
+    if(document.getElementById("orderQuestions").value==="random")
+      shuffle(questions);
+    if(document.getElementById("orderQuestions").value==="alphabetic")
+      questions.sort((a,b)=>a.q.localeCompare(b.q));
+  }
 
-function startStudy(){
-  quizQuestions=[...database];
-  if(document.getElementById("orderQuestions").value==="random") shuffle(quizQuestions);
-  currentIndex=0;
-  sessionCorrect=0;sessionWrong=0;answered={};
-  document.getElementById("config").style.display="none";
+  document.getElementById("menu").style.display="none";
   document.getElementById("quiz").style.display="block";
-  document.getElementById("navBar").style.display="flex";
-  loadQuestion();
+  document.getElementById("nav").style.display=mode==="study"?"flex":"none";
+  i=0;ok=0;ko=0;answered={};
+  load();
 }
 
-function loadQuestion(){
-  const q=quizQuestions[currentIndex];
-  document.getElementById("quiz-header").innerText=`Domanda ${currentIndex+1}/${quizQuestions.length}`;
-  document.getElementById("quiz-question").innerHTML="<b>"+q.q+"</b>";
-  const opts=document.getElementById("quiz-options");
-  opts.innerHTML="";
-  let answers=[...q.options];
-  if(document.getElementById("orderAnswers").value==="random") shuffle(answers);
-  answers.forEach(o=>{
+function load(){
+  const q=questions[i];
+  document.getElementById("progress").innerText=`Domanda ${i+1}/${questions.length}`;
+  document.getElementById("status").innerText=`✔️ ${ok} ❌ ${ko}`;
+  document.getElementById("question").innerHTML="<b>"+q.q+"</b>";
+  const box=document.getElementById("options");
+  box.innerHTML="";
+  let opts=[...q.o];
+  if(mode==="exam" || document.getElementById("orderAnswers").value==="random")
+    shuffle(opts);
+
+  opts.forEach(txt=>{
     const d=document.createElement("div");
     d.className="option";
-    d.innerText=o;
-    d.onclick=()=>answer(q,o,d);
-    opts.appendChild(d);
+    d.innerText=txt;
+    d.onclick=()=>answer(q,txt,d,opts);
+    box.appendChild(d);
   });
 }
 
-function answer(q,text,el){
+function answer(q,txt,el,opts){
   if(answered[q.id])return;
   answered[q.id]=true;
-  const correct=q.options[q.a]===text;
-  el.style.background=correct?"#c8f7c5":"#f7c5c5";
-  correct?sessionCorrect++:sessionWrong++;
-  document.getElementById("okCount").innerText=sessionCorrect;
-  document.getElementById("koCount").innerText=sessionWrong;
+  const correct=q.o[q.a];
+
+  document.querySelectorAll(".option").forEach(o=>{
+    if(o.innerText===correct) o.classList.add("correct");
+  });
+
+  if(txt===correct){ok++;} else {el.classList.add("wrong");ko++;}
+  document.getElementById("status").innerText=`✔️ ${ok} ❌ ${ko}`;
 }
 
-function prevQuestion(){if(currentIndex>0){currentIndex--;loadQuestion();}}
-function nextQuestion(){if(currentIndex<quizQuestions.length-1){currentIndex++;loadQuestion();}}
+function prev(){if(i>0){i--;load();}}
+function next(){if(i<questions.length-1){i++;load();}}
+function goMenu(){location.reload();}
 
-function goToMenu(){location.reload();}
-
-// NOTE
+/* NOTE */
 function openNote(){
-  const notes=JSON.parse(localStorage.getItem(NOTES_KEY))||{};
-  document.getElementById("noteBox").value=notes[quizQuestions[currentIndex].id]||"";
+  const n=JSON.parse(localStorage.getItem(NOTES))||{};
+  document.getElementById("noteBox").value=n[questions[i].id]||"";
   document.getElementById("noteModal").style.display="flex";
 }
 function closeNote(){document.getElementById("noteModal").style.display="none";}
 function saveNote(){
-  const notes=JSON.parse(localStorage.getItem(NOTES_KEY))||{};
-  notes[quizQuestions[currentIndex].id]=document.getElementById("noteBox").value;
-  localStorage.setItem(NOTES_KEY,JSON.stringify(notes));
+  const n=JSON.parse(localStorage.getItem(NOTES))||{};
+  n[questions[i].id]=document.getElementById("noteBox").value;
+  localStorage.setItem(NOTES,JSON.stringify(n));
 }
 function deleteNote(){
-  const notes=JSON.parse(localStorage.getItem(NOTES_KEY))||{};
-  delete notes[quizQuestions[currentIndex].id];
-  localStorage.setItem(NOTES_KEY,JSON.stringify(notes));
+  const n=JSON.parse(localStorage.getItem(NOTES))||{};
+  delete n[questions[i].id];
+  localStorage.setItem(NOTES,JSON.stringify(n));
   document.getElementById("noteBox").value="";
+}
+
+/* TIMER */
+let t;
+function startTimer(s){
+  t=setInterval(()=>{
+    s--;
+    document.getElementById("status").innerText=`⏱ ${Math.floor(s/60)}:${("0"+s%60).slice(-2)}`;
+    if(s<=0){clearInterval(t);alert("Tempo scaduto");}
+  },1000);
 }
 
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}}
@@ -208,5 +261,3 @@ function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random
 
 </body>
 </html>
- 
-
